@@ -597,3 +597,115 @@ We see that our RMSE for our test set is very close to the RMSE we obtained on o
     # results
     caret::RMSE(pred, test$disposals)
     ## [1] 4.345416
+
+## Viewing predictions with [Shiny](https://cran.r-project.org/web/packages/shiny/index.html)
+Once we have our predictions, we can use [Shiny](https://cran.r-project.org/web/packages/shiny/index.html) to bring these together for each round, and include some other key stats.  
+
+Create min and max for disposals heat map:
+
+    x_min <- 10
+    x_max <- 30
+    x <- c(x_min,x_max)
+    quantile(x,probs = seq(0, 1, 0.25))
+
+Set breaks and colours for heat map:
+
+    brks <- as.vector(quantile(x, probs = seq(0, 1, 0.25)))
+    ramp <- colorRampPalette(c("white", "lightgreen","lightblue","orange"))
+    clrs <- ramp(length(brks) + 1)
+
+Define the ui:
+
+    ui <- fluidPage(
+    tags$head(
+        tags$style(HTML(
+        "table {table-layout: fixed;}",
+        "td {white-space: nowrap;}",
+        "div.dataTables_wrapper div.dataTables_filter input {width: 75%;}",
+        '.navbar { background-color: lightgray;}
+                .navbar-default .navbar-brand{color: white;}
+                .tab-panel{ background-color: lightgray; color: black}
+                .navbar-default .navbar-nav > .active > a, 
+                .navbar-default .navbar-nav > .active > a:focus, 
+                .navbar-default .navbar-nav > .active > a:hover {color: black; background-color: gray;',
+        ))),
+ 
+      titlePanel(div("AFL - Rd 16: Player Disposals", style = "font-size: 70%")),
+      navbarPage("",
+                 tags$style(HTML('.navbar-nav > li > a, .navbar-brand {
+                       padding-top:0px !important; 
+                       padding-bottom:6px !important;
+                       height: 20px;}
+                       .navbar {min-height:20px !important;}')),
+                 id = "navbarID",
+                 tabPanel("All", ""),
+                 tabPanel("Adelaide", ""),
+                 tabPanel("Brisbane", ""),
+                 tabPanel("Carlton", ""),
+                 tabPanel("Collingwood", ""),
+                 tabPanel("Essendon", ""),
+                 tabPanel("Fremantle", ""),
+                 tabPanel("Geelong", ""),
+                 tabPanel("Gold Coast", ""),
+                 tabPanel("Greater Western Sydney", ""),
+                 tabPanel("Hawthorn", ""),
+                 tabPanel("Melbourne", ""),
+                 tabPanel("North Melbourne", ""),
+                 tabPanel("Port Adelaide", ""),
+                 tabPanel("Richmond", ""),
+                 tabPanel("St Kilda", ""),
+                 tabPanel("Sydney", ""),
+                 tabPanel("West Coast", ""),
+                 tabPanel("Western Bulldogs", ""),
+                 
+                 tags$style("li a {
+                            font-size: 9px;
+                            font-weight: bold;}"),
+                 mainPanel(div(DT::dataTableOutput("my_table"), style = "font-size: 65%; width: 150%"))
+      )
+    )
+
+Output to server:
+
+    server <- function(input, output) {
+    
+    table <- reactive({
+        
+        if (input$navbarID == 'All') {
+        df1.1
+        
+        } else { 
+        df1.1 %>% 
+            filter(TEAM == input$navbarID)
+        }
+        
+    })
+    
+    output$my_table <- DT::renderDataTable({
+        DT::datatable(table(),
+                    options = list(
+                        autoWidth = TRUE,
+                        scrollX = FALSE, scrollY = "540px",
+                        iDisplayLength = 100, # show default number of entries,
+                        initComplete = JS(
+                        "function(settings, json) {",
+                        "$(this.api().table().header()).css({'background-color': 'lightblue', 'color': 'black'});",
+                        "}"),
+                        columnDefs = list(
+                        
+                        list(targets = 5, width = "70px"),
+                        list(targets = 6:7, width = "80px"),
+                        list(targets = c(0,8:38), width = "1px"),
+                        list(className = 'dt-center', targets = c(0,8:38)),
+                        list(className = 'dt-head-center', targets = (8:38)),
+                        list(visible=FALSE, targets=c(0:4,39))))) %>% # hide cols 0-3,38
+        formatStyle(c('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20'),
+                    backgroundColor = styleInterval(brks, clrs),
+                    fontWeight = 
+        )
+    })  
+    }
+
+    shinyApp(ui, server)
+
+![shiny](https://github.com/mattm14/AFL-Player-Disposal-Prediction/assets/34406190/46dc0997-1950-4fe3-b686-c670ced254d4)
