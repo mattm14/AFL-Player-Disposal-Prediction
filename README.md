@@ -627,7 +627,7 @@ Define the ui:
                 .tab-panel{ background-color: lightgray; color: black}
                 .navbar-default .navbar-nav > .active > a, 
                 .navbar-default .navbar-nav > .active > a:focus, 
-                .navbar-default .navbar-nav > .active > a:hover {color: black; background-color: gray;',
+                .navbar-default .navbar-nav > .active > a:hover {color: black; background-color: gray;}',
         ))),
  
       titlePanel(div("AFL - Rd 16: Player Disposals", style = "font-size: 70%")),
