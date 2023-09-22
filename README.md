@@ -598,6 +598,51 @@ We see that our RMSE for our test set is very close to the RMSE we obtained on o
     caret::RMSE(pred, test$disposals)
     ## [1] 4.345416
 
+    # add predictions back into test data
+    test <- cbind(test, pred)
+
+## Set up df for shiny
+
+    # add player/match data back to test df
+    test$match_home_team <- s2023$match_home_team[match(test$match_id, s2023$match_id)]
+    test$match_away_team <- s2023$match_away_team[match(test$match_id, s2023$match_id)]
+    test$venue_name <- s2023$venue_name[match(test$match_id, s2023$match_id)]
+    test$match_date <- s2023$match_date[match(test$match_id, s2023$match_id)]
+    test$match_round <- s2023$match_round[match(test$match_id, s2023$match_id)]
+    
+    test$player_first_name <- s2023$player_first_name[match(test$player_id, s2023$player_id)]
+    test$player_last_name <- s2023$player_last_name[match(test$player_id, s2023$player_id)]
+    test$player_name <- factor(paste(test$player_first_name, test$player_last_name, sep = " ")) # join name
+    test$player_team <- s2023$player_team[match(test$player_id, s2023$player_id)]
+    
+    # subset test data to look at round 1 2023 only
+    df1.1 <- subset(test, test$match_round == 1 )
+    
+    # arrange data
+    df1.1 <- df1.1 %>%
+      arrange(match_id, match_home_team, match_away_team, player_team)
+    
+    # round the predicted no. of disposals
+    df1.1$pred <- round(df1.1$pred,0)
+        
+    # select req'd cols
+    df1.1 <- df1.1[c('match_home_team', 'match_away_team', 'venue_name', 'match_date', 'match_id', 'match_round',
+                   'player_id', 'player_team', 'player_name', 'pred', 'disposals')]
+
+
+    # add last 10 games' disposals
+    s2022 <- s2022 %>% 
+      arrange(player_id, match_date) %>%
+      group_by(player_id) %>% 
+      dplyr::slice(tail(row_number(), 10))
+    
+    df_last_10 <- setDT(s2022)[, c(paste0(1:10)):=shift(disposals, 0:9), by=player_id][]
+    df_last_10 <- df_last_10[,c('player_id', 1,2,3,4,5,6,7,8,9,10)]
+    df_last_10 <- na.omit(df_last_10)
+    
+    # join dfs
+    df1.1 <- left_join(df1.1, df_last_10, by = c('player_id'))
+
 ## Viewing predictions with [Shiny](https://cran.r-project.org/web/packages/shiny/index.html)
 Once we have our predictions, we can use [Shiny](https://cran.r-project.org/web/packages/shiny/index.html) to bring these together for each round, and include some other key stats.  
 
@@ -630,7 +675,7 @@ Define the ui:
                 .navbar-default .navbar-nav > .active > a:hover {color: black; background-color: gray;}',
         ))),
  
-      titlePanel(div("AFL - Rd 16: Player Disposals", style = "font-size: 70%")),
+      titlePanel(div("AFL - Rd 1 2023: Player Disposals", style = "font-size: 70%")),
       navbarPage("",
                  tags$style(HTML('.navbar-nav > li > a, .navbar-brand {
                        padding-top:0px !important; 
@@ -691,17 +736,13 @@ Output to server:
                         "function(settings, json) {",
                         "$(this.api().table().header()).css({'background-color': 'lightblue', 'color': 'black'});",
                         "}"),
-                        columnDefs = list(
-                        
-                        list(targets = 5, width = "70px"),
-                        list(targets = 6:7, width = "80px"),
-                        list(targets = c(0,8:38), width = "1px"),
-                        list(className = 'dt-center', targets = c(0,8:38)),
-                        list(className = 'dt-head-center', targets = (8:38)),
-                        list(visible=FALSE, targets=c(0:4,39))))) %>% # hide cols 0-3,38
-        formatStyle(c('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20'),
-                    backgroundColor = styleInterval(brks, clrs),
-                    fontWeight = 
+                        columnDefs = list(                      
+                        list(targets = c(0:9), width = "50px"),
+                        list(targets = c(10:20), width = "1px"),
+                        list(className = 'dt-center', targets = c(0,10:20)),
+                        list(className = 'dt-head-center', targets = (10:20))))) %>% 
+                    formatStyle(c('1','2','3','4','5','6','7','8','9','10'),
+                    backgroundColor = styleInterval(brks, clrs)
         )
     })  
     }
