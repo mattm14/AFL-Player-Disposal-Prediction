@@ -224,15 +224,15 @@ library(gbm)
 library(xgboost)
 
 # take only relevant cols
-df1 <- df1[, c(1,3,15:22)]
+df1 <- df1[, c(1,4,15:22)]
 
 # split train and test
 train <- subset(df1, df1$season == '2022')
 test <- subset(df1, df1$season == '2023')
 
 # remove season
-train <- train[ ,-2]
-test <- test[ ,-2]
+train <- train[ ,-3]
+test <- test[ ,-3]
 
 # for reproducibility
 set.seed(123)
@@ -476,5 +476,157 @@ pred <- predict(gbm.fit.final, n.trees = gbm.fit.final$n.trees, test)
 # results
 caret::RMSE(pred, test$disposals)
 ## [1] 4.345416
+
+# add predictions back into test data
+test <- cbind(test, pred)
+
+#############################################################################################################
+# set up df for shiny
+
+# add player/match data back to test df
+test$match_home_team <- s2023$match_home_team[match(test$match_id, s2023$match_id)]
+test$match_away_team <- s2023$match_away_team[match(test$match_id, s2023$match_id)]
+test$venue_name <- s2023$venue_name[match(test$match_id, s2023$match_id)]
+test$match_date <- s2023$match_date[match(test$match_id, s2023$match_id)]
+test$match_round <- s2023$match_round[match(test$match_id, s2023$match_id)]
+
+test$player_first_name <- s2023$player_first_name[match(test$player_id, s2023$player_id)]
+test$player_last_name <- s2023$player_last_name[match(test$player_id, s2023$player_id)]
+test$player_name <- factor(paste(test$player_first_name, test$player_last_name, sep = " ")) # join name
+test$player_team <- s2023$player_team[match(test$player_id, s2023$player_id)]
+
+# subset test data to look at round 1 2023 only
+df1.1 <- subset(test, test$match_round == 1 )
+
+# arrange data
+df1.1 <- df1.1 %>%
+  arrange(match_id, match_home_team, match_away_team, player_team)
+
+# round the predicted no. of disposals
+df1.1$pred <- round(df1.1$pred,0)
+
+
+# select req'd cols
+df1.1 <- df1.1[c('match_home_team', 'match_away_team', 'venue_name', 'match_date', 'match_id', 'match_round',
+               'player_id', 'player_team', 'player_name', 'pred')]
+
+
+########################
+# add last 10 games' disposals
+s2022 <- s2022 %>% 
+  arrange(player_id, match_date) %>%
+  group_by(player_id) %>% 
+  dplyr::slice(tail(row_number(), 10))
+
+df_last_10 <- setDT(s2022)[, c(paste0(1:10)):=shift(disposals, 0:9), by=player_id][]
+df_last_10 <- df_last_10[,c('player_id', 1,2,3,4,5,6,7,8,9,10)]
+df_last_10 <- na.omit(df_last_10)
+
+# join dfs
+df1.1 <- left_join(df1.1, df_last_10, by = c('player_id'))
+
+
+#############################################################################################################
+### add to Shiny
+
+# create min and max for disposals heat map
+x_min <- 10
+x_max <- 30
+x <- c(x_min,x_max)
+quantile(x,probs = seq(0, 1, 0.25))
+
+# set breaks and colours for heat map
+brks <- as.vector(quantile(x, probs = seq(0, 1, 0.25)))
+ramp <- colorRampPalette(c("white", "lightgreen","lightblue","orange"))
+clrs <- ramp(length(brks) + 1)
+
+# define the ui
+ui <- fluidPage(
+  tags$head(
+    tags$style(HTML(
+      "table {table-layout: fixed;}",
+      "td {white-space: nowrap;}",
+      "div.dataTables_wrapper div.dataTables_filter input {width: 75%;}",
+      '.navbar { background-color: lightgray;}
+            .navbar-default .navbar-brand{color: white;}
+            .tab-panel{ background-color: lightgray; color: black}
+            .navbar-default .navbar-nav > .active > a, 
+            .navbar-default .navbar-nav > .active > a:focus, 
+            .navbar-default .navbar-nav > .active > a:hover {color: black; background-color: gray;',
+    ))),
+  # Application title
+  titlePanel(div("AFL - Rd 1 2023: Player Disposals", style = "font-size: 70%")),
+  navbarPage("",
+             tags$style(HTML('.navbar-nav > li > a, .navbar-brand {
+                   padding-top:0px !important; 
+                   padding-bottom:6px !important;
+                   height: 20px;}
+                   .navbar {min-height:20px !important;}')),
+             id = "navbarID",
+             tabPanel("All", ""),
+             tabPanel("Adelaide", ""),
+             tabPanel("Brisbane", ""),
+             tabPanel("Carlton", ""),
+             tabPanel("Collingwood", ""),
+             tabPanel("Essendon", ""),
+             tabPanel("Fremantle", ""),
+             tabPanel("Geelong", ""),
+             tabPanel("Gold Coast", ""),
+             tabPanel("Greater Western Sydney", ""),
+             tabPanel("Hawthorn", ""),
+             tabPanel("Melbourne", ""),
+             tabPanel("North Melbourne", ""),
+             tabPanel("Port Adelaide", ""),
+             tabPanel("Richmond", ""),
+             tabPanel("St Kilda", ""),
+             tabPanel("Sydney", ""),
+             tabPanel("West Coast", ""),
+             tabPanel("Western Bulldogs", ""),
+             
+             tags$style("li a {
+                        font-size: 9px;
+                        font-weight: bold;}"),
+             mainPanel(div(DT::dataTableOutput("my_table"), style = "font-size: 65%; width: 150%"))
+  )
+)
+
+# output to server
+server <- function(input, output) {
+  
+  table <- reactive({
+    
+    if (input$navbarID == 'All') {
+      df1.1
+      
+    } else { 
+      df1.1 %>% 
+        filter(player_team == input$navbarID)
+    }
+    
+  })
+  
+  output$my_table <- DT::renderDataTable({
+    DT::datatable(table(),
+                  options = list(
+                    autoWidth = TRUE,
+                    scrollX = FALSE, scrollY = "540px",
+                    iDisplayLength = 100, # show default number of entries,
+                    initComplete = JS(
+                      "function(settings, json) {",
+                      "$(this.api().table().header()).css({'background-color': 'lightblue', 'color': 'black'});",
+                      "}"),
+                    columnDefs = list(
+                      list(targets = 0:9, width = "50px"),
+                      list(targets = c(10:20), width = "1px"),
+                      list(className = 'dt-center', targets = c(0,10:20)),
+                      list(className = 'dt-head-center', targets = (10:20))
+                      ))) %>% # hide cols 0-3,38
+      formatStyle(c('1','2','3','4','5','6','7','8','9','10'),
+                  backgroundColor = styleInterval(brks, clrs),
+      )
+  })  
+}
+
+shinyApp(ui, server)
 
 
