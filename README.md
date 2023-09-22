@@ -629,7 +629,6 @@ We see that our RMSE for our test set is very close to the RMSE we obtained on o
     df1.1 <- df1.1[c('match_home_team', 'match_away_team', 'venue_name', 'match_date', 'match_id', 'match_round',
                    'player_id', 'player_team', 'player_name', 'pred', 'disposals')]
 
-
     # add last 10 games' disposals
     s2022 <- s2022 %>% 
       arrange(player_id, match_date) %>%
@@ -748,5 +747,6 @@ Output to server:
     }
 
     shinyApp(ui, server)
+    
+![shiny2](https://github.com/mattm14/AFL-Player-Disposal-Prediction/assets/34406190/8a1d64f1-8f7c-405b-97ac-b4d6654d777b)
 
-![shiny](https://github.com/mattm14/AFL-Player-Disposal-Prediction/assets/34406190/46dc0997-1950-4fe3-b686-c670ced254d4)
