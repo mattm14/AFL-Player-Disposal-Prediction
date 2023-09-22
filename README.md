@@ -627,7 +627,7 @@ We see that our RMSE for our test set is very close to the RMSE we obtained on o
         
     # select req'd cols
     df1.1 <- df1.1[c('match_home_team', 'match_away_team', 'venue_name', 'match_date', 'match_id', 'match_round',
-                   'player_id', 'player_team', 'player_name', 'pred', 'disposals')]
+                   'player_id', 'player_team', 'player_name', 'pred')]
 
     # add last 10 games' disposals
     s2022 <- s2022 %>% 
